@@ -41,13 +41,35 @@ Before you can add documents to an index you need to define the field types and 
 
 ### Search and index
 
-To search you must supplt an index, default field to search, a search term and a max number of results to return
+To search you must supply an index, default field to search, a search term and a max number of results to return
 
     (closest/search index "id" "1" 1)
 
 You can also provide more complex queries
 
-    (closest/search idnex "id" "name:Rimm*" 10)
+    (closest/search index "id" "name:Rimm*" 10)
+
+Todo
+----
+
+ * Provide more field types
+    * BinaryDocValuesField
+    * DoubleDocValuesField
+    * DoubleField
+    * FloatDocValuesField
+    * FloatField
+    * IntField
+    * LongField
+    * NumericDocValuesField
+    * SortedDocValuesField
+    * SortedNumericDocValuesField
+    * SortedSetDocValuesField
+    * StoredField
+
+ * Provide functions to provide pagination
+ * Provide functions to provide highlighting
+ * Provide a way to specify sorting
+
 
 ## License
 
