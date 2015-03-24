@@ -1,11 +1,12 @@
 (ns closest.core
   (:import (org.apache.lucene.store RAMDirectory NIOFSDirectory Directory)
-           (org.apache.lucene.document TextField Document Field StringField)
+           (org.apache.lucene.document TextField Document Field StringField SortedDocValuesField)
            (org.apache.lucene.index IndexWriter IndexWriterConfig DirectoryReader IndexReader)
            (org.apache.lucene.analysis.standard StandardAnalyzer)
-           (org.apache.lucene.search IndexSearcher ScoreDoc)
+           (org.apache.lucene.search IndexSearcher ScoreDoc Sort SortField SortField$Type)
            (org.apache.lucene.queryparser.classic QueryParser)
-           (java.nio.file Paths)))
+           (java.nio.file Paths)
+           (org.apache.lucene.util BytesRef)))
 
 (def analyzer (StandardAnalyzer.))
 
@@ -40,11 +41,21 @@
   "A field that is indexed but not tokenized: the entire String value is indexed as a single token. For example this might be used for a 'country' field or an 'id' field, or any field that you intend to use for sorting or access through the field cache."
   {field-name (if stored StringField/TYPE_STORED StringField/TYPE_NOT_STORED)})
 
+(defn sorted-doc-values-field [field-name]
+  "Field that stores a per-document BytesRef value, indexed for sorting. Here's an example usage:"
+  {field-name SortedDocValuesField/TYPE})
+
+(defn string-sort [field-name reverse]
+  {:name field-name :type SortField$Type/STRING :reverse reverse})
+
 (defn- map->doc [map document-field-options]
   "Create a Lucene Document from a map of values and a map of field options"
   (let [document (Document.)]
     (doseq [[key value] map]
-      (.add document (Field. (name key) value (key document-field-options))))
+      (.add document
+            (if (identical? (key document-field-options) SortedDocValuesField/TYPE)
+              (Field. (name key) (BytesRef. value) (key document-field-options))
+              (Field. (name key) value (key document-field-options)))))
     document))
 
 (defn- doc->map [document]
@@ -56,17 +67,25 @@
   (with-open [index-writer (index-writer index)]
     (.addDocument index-writer (map->doc document document-field-options))))
 
-(defn search [index default-field query max-results]
+(defn search
   "Search index with query"
-  (with-open [reader (index-reader index)]
-    (let [searcher (IndexSearcher. reader)
-          parser (QueryParser. (name default-field) analyzer)
-          query (.parse parser query)
-          hits (.search searcher query (int max-results))]
-      (doall
-        (with-meta
-          (map #(doc->map (.doc ^IndexSearcher searcher (.doc ^ScoreDoc %))) (.scoreDocs hits))
-          {:total-results (.totalHits hits)})))))
+  ([index default-field query max-results]
+    (search index default-field query max-results nil))
+  ([index default-field query max-results sort-options]
+    (with-open [reader (index-reader index)]
+      (let [searcher (IndexSearcher. reader)
+            parser (QueryParser. (name default-field) analyzer)
+            query (.parse parser query)
+            hits (if (nil? sort-options)
+                   (.search searcher query (int max-results))
+                   (.search searcher
+                            query
+                            (int max-results)
+                            (Sort. (SortField. (name (:name sort-options)) (:type sort-options) (:reverse sort-options)))))]
+        (doall
+          (with-meta
+            (map #(doc->map (.doc ^IndexSearcher searcher (.doc ^ScoreDoc %))) (.scoreDocs hits))
+            {:total-results (.totalHits hits)}))))))
 
 (defn delete-all [index]
   "Delete all document in a query"
@@ -79,3 +98,11 @@
   (if (nil? s)
     ""
     (QueryParser/escape s)))
+
+(defn search-range
+  "Search index with query, returning results from the start position untill max-results or no more results"
+  ([index default-field query start max-results]
+    (search-range index default-field query start max-results nil))
+  ([index default-field query start max-results sort-options]
+    (let [results (search index default-field query (+ start max-results) sort-options)]
+      (drop start results))))

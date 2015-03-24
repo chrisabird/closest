@@ -5,7 +5,8 @@
 (def document-field-options
   (merge
     (text-field :name true)
-    (string-field :id false)))
+    (string-field :id false)
+    (sorted-doc-values-field :sort-name)))
 
 ;BinaryDocValuesField
 ;DoubleDocValuesField
@@ -15,26 +16,27 @@
 ;IntField
 ;LongField
 ;NumericDocValuesField
-;SortedDocValuesField
 ;SortedNumericDocValuesField
 ;SortedSetDocValuesField
 ;StoredField
-;StringField
-;TextField
+
 
 (deftest test-search
   (let [index (memory-index)]
     (add index
          {:name "Arnold Rimmer"
-          :id "ABC123"}
+          :id "ABC123"
+          :sort-name "Arnold-Rimmer"}
          document-field-options)
     (add index
          {:name "Yvonne McGruder"
-          :id "ABC456"}
+          :id "ABC456"
+          :sort-name "Yvonne McGruder"}
          document-field-options)
     (add index
          {:name "Ace Rimmer"
-          :id "ABC789"}
+          :id "ABC789"
+          :sort-name "Ace Rimmer"}
          document-field-options)
     (testing "Exact match"
       (let [result (search index "name" "Arnold Rimmer" 1)]
@@ -49,7 +51,16 @@
     (testing "Queries with more results than requested"
       (let [result (search index "name" "Rimmer*" 1)]
         (is (= 1 (count result)))
-        (is (= 2 (:total-results (meta result))))))))
+        (is (= 2 (:total-results (meta result))))))
+    (testing "Query for a range of results"
+      (let [result (search-range index "name" "Rimm*" 1 1)]
+        (is (= 1 (count result)))
+        (is (= "Ace Rimmer" (:name (first result))))))
+    (testing "Query for a range of results that are sorted"
+      (let [sort (string-sort :sort-name false)
+            result (search-range index "name" "Rimm*" 1 1 sort)]
+        (is (= 1 (count result)))
+        (is (= "Arnold Rimmer" (:name (first result))))))))
 
 
 

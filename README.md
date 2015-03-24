@@ -49,6 +49,35 @@ You can also provide more complex queries
 
     (closest/search index "id" "name:Rimm*" 10)
 
+### Search and return specific range
+
+Start at 10th result and return 10 more or until there are no more results
+
+    (closest/search index "id" "name:Rimm*" 10 10)
+
+### Sorting by string value
+
+Define a document with a field that can be sorted by
+
+    (def document-field-options
+      (merge
+        (text-field :name true)
+        (sorted-doc-values-field :name))
+
+Add document providing a value for the sort field
+
+    (closest/add index {:name "Arnold Rimmer" :sort-name "Arnold Rimmer"} document-field-options)
+    (closest/add index {:name "Ace Rimmer" :sort-name "Arnold Rimmer"} document-field-options)
+
+Define a sort criteria
+
+    (def sort (string-sort :sort-name false))
+
+Search document and sort results by criteria
+
+    (closest/search index "id" "name:Rimm*" 10 sort)
+
+
 Todo
 ----
 
@@ -61,15 +90,11 @@ Todo
     * IntField
     * LongField
     * NumericDocValuesField
-    * SortedDocValuesField
     * SortedNumericDocValuesField
     * SortedSetDocValuesField
     * StoredField
 
- * Provide functions to provide pagination
  * Provide functions to provide highlighting
- * Provide a way to specify sorting
-
 
 ## License
 
