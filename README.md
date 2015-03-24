@@ -94,6 +94,7 @@ Todo
     * SortedSetDocValuesField
     * StoredField
 
+ * Provide more sort field types
  * Provide functions to provide highlighting
 
 ## License
