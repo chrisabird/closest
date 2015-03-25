@@ -107,5 +107,6 @@
   ([index default-field query start max-results]
     (search-range index default-field query start max-results nil))
   ([index default-field query start max-results sort-options]
-    (let [results (search index default-field query (+ start max-results) sort-options)]
-      (drop start results))))
+    (let [results (search index default-field query (+ start max-results) sort-options)
+          meta-data (meta results)]
+      (with-meta (drop start results) meta-data))))
