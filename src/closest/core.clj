@@ -52,10 +52,13 @@
   "Create a Lucene Document from a map of values and a map of field options"
   (let [document (Document.)]
     (doseq [[key value] map]
-      (.add document
-            (if (identical? (key document-field-options) SortedDocValuesField/TYPE)
-              (Field. (name key) (BytesRef. value) (key document-field-options))
-              (Field. (name key) value (key document-field-options)))))
+      (let [type (key document-field-options)]
+        (if (nil? type)
+          (throw (Exception. (str "Missing document field options for " (name key)) ))
+          (.add document
+                (if (identical? (key document-field-options) SortedDocValuesField/TYPE)
+                  (Field. (name key) (BytesRef. value) type)
+                  (Field. (name key) value type))))))
     document))
 
 (defn- doc->map [document]
