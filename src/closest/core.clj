@@ -59,6 +59,13 @@
 (defn int-sort [field-name reverse]
   {:name field-name :type SortField$Type/INT :reverse reverse})
 
+(defn str->lng [value]
+  (try
+    (if (nil? value)
+      0
+      (.longValue (Integer/valueOf value)))
+    (catch Exception e 0)))
+
 (defn- map->doc [map document-field-options]
   "Create a Lucene Document from a map of values and a map of field options"
   (let [document (Document.)]
@@ -70,7 +77,7 @@
           (.add document
                 (cond
                   (identical? type SortedDocValuesField/TYPE) (SortedDocValuesField. field-name (BytesRef. value))
-                  (identical? type NumericDocValuesField/TYPE) (NumericDocValuesField. field-name (.longValue (Integer/valueOf value)))
+                  (identical? type NumericDocValuesField/TYPE) (NumericDocValuesField. field-name (str->lng value))
                   (identical? type TextField/TYPE_STORED) (TextField. field-name value Field$Store/YES)
                   (identical? type TextField/TYPE_NOT_STORED) (TextField. field-name value Field$Store/NO)
                   (identical? type StringField/TYPE_STORED) (StringField. field-name value Field$Store/YES)
