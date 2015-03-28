@@ -1,12 +1,12 @@
 (ns closest.core
   (:import (org.apache.lucene.store RAMDirectory NIOFSDirectory Directory)
-           (org.apache.lucene.document TextField Document Field StringField SortedDocValuesField)
+           (org.apache.lucene.document TextField Document Field StringField SortedDocValuesField SortedNumericDocValuesField Field$Store IntField NumericDocValuesField)
            (org.apache.lucene.index IndexWriter IndexWriterConfig DirectoryReader IndexReader)
            (org.apache.lucene.analysis.standard StandardAnalyzer)
            (org.apache.lucene.search IndexSearcher ScoreDoc Sort SortField SortField$Type)
            (org.apache.lucene.queryparser.classic QueryParser)
            (java.nio.file Paths)
-           (org.apache.lucene.util BytesRef)))
+           (org.apache.lucene.util BytesRef NumericUtils)))
 
 (def analyzer (StandardAnalyzer.))
 
@@ -42,23 +42,42 @@
   {field-name (if stored StringField/TYPE_STORED StringField/TYPE_NOT_STORED)})
 
 (defn sorted-doc-values-field [field-name]
-  "Field that stores a per-document BytesRef value, indexed for sorting. Here's an example usage:"
+  "Field that stores a per-document BytesRef value, indexed for sorting."
   {field-name SortedDocValuesField/TYPE})
+
+(defn sorted-numeric-doc-values-field [field-name]
+  "Field that stores a per-document long value for scoring, sorting or value retrieval."
+  {field-name NumericDocValuesField/TYPE})
+
+(defn int-field [field-name stored]
+  "Field that indexes int values for efficient range filtering and sorting"
+  {field-name (if stored StringField/TYPE_STORED StringField/TYPE_NOT_STORED)})
 
 (defn string-sort [field-name reverse]
   {:name field-name :type SortField$Type/STRING :reverse reverse})
+
+(defn int-sort [field-name reverse]
+  {:name field-name :type SortField$Type/INT :reverse reverse})
 
 (defn- map->doc [map document-field-options]
   "Create a Lucene Document from a map of values and a map of field options"
   (let [document (Document.)]
     (doseq [[key value] map]
-      (let [type (key document-field-options)]
+      (let [type (key document-field-options)
+            field-name (name key)]
         (if (nil? type)
           (throw (Exception. (str "Missing document field options for " (name key)) ))
           (.add document
-                (if (identical? (key document-field-options) SortedDocValuesField/TYPE)
-                  (Field. (name key) (BytesRef. value) type)
-                  (Field. (name key) value type))))))
+                (cond
+                  (identical? type SortedDocValuesField/TYPE) (SortedDocValuesField. field-name (BytesRef. value))
+                  (identical? type NumericDocValuesField/TYPE) (NumericDocValuesField. field-name (.longValue (Integer/valueOf value)))
+                  (identical? type TextField/TYPE_STORED) (TextField. field-name value Field$Store/YES)
+                  (identical? type TextField/TYPE_NOT_STORED) (TextField. field-name value Field$Store/NO)
+                  (identical? type StringField/TYPE_STORED) (StringField. field-name value Field$Store/YES)
+                  (identical? type StringField/TYPE_NOT_STORED) (StringField. field-name value Field$Store/NO)
+                  (identical? type IntField/TYPE_NOT_STORED) (IntField. field-name value Field$Store/YES)
+                  (identical? type IntField/TYPE_NOT_STORED) (IntField. field-name value Field$Store/NO)
+                  )))))
     document))
 
 (defn- doc->map [document]
